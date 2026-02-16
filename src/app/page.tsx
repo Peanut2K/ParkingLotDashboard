@@ -57,8 +57,7 @@ export default async function Home() {
               ParkingLot Dashboard
             </h1>
             <p className="max-w-2xl text-base text-stone-600 sm:text-lg">
-              ดูจำนวนที่จอดรวมและที่ว่างแบบ real-time รองรับหลายตึกและหลายชั้น
-              พร้อมขยายในอนาคตได้ทันที
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
             </p>
           </div>
           <div className="glass-panel flex flex-col gap-3 rounded-3xl px-6 py-5 text-sm text-stone-700">
