@@ -1,47 +1,130 @@
+"use client";
 import Link from "next/link";
-import {
-  getFloors,
-  getOverview,
-  mockParkingData,
-} from "@/data/parking-data";
+import { useEffect, useState } from "react";
+
+type ParkingSpot = {
+  id: number;
+  floor_id: number;
+  spot_number: string;
+  is_occupied: number;
+  camera_url: string | null;
+  last_update: string;
+  floor_name: string;
+};
+
+type ApiResponse = {
+  status: string;
+  count: number;
+  available_count: number;
+  occupied_count: number;
+  parking_spots: ParkingSpot[];
+};
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export default async function Home() {
+export default function Home() {
+  const [parkingData, setParkingData] = useState<ApiResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchData = async () => {
+      try {
+        const response = await fetch('/api/parking-spots');
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+
+        const data: ApiResponse = await response.json();
+        
+        if (isMounted) {
+          setParkingData(data);
+        }
+      } catch (error) {
+        console.error('Error fetching parking data:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="dashboard-bg min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-stone-900 border-r-transparent"></div>
+          <p className="mt-4 text-stone-600">กำลังโหลดข้อมูล...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!parkingData) {
+    return (
+      <div className="dashboard-bg min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-stone-600">ไม่สามารถโหลดข้อมูลได้</p>
+        </div>
+      </div>
+    );
+  }
+
+  // จัดกลุ่มข้อมูลตาม floor
+  const floorGroups = parkingData.parking_spots.reduce((acc, spot) => {
+    if (!acc[spot.floor_id]) {
+      acc[spot.floor_id] = {
+        floor_id: spot.floor_id,
+        floor_name: spot.floor_name,
+        spots: []
+      };
+    }
+    acc[spot.floor_id].spots.push(spot);
+    return acc;
+  }, {} as Record<number, { floor_id: number; floor_name: string; spots: ParkingSpot[] }>);
+
+  const floors = Object.values(floorGroups);
   
-  const data = mockParkingData;
-  const overview = getOverview(data);
-  const floors = getFloors(data);
+  const overview = {
+    total: parkingData.count,
+    available: parkingData.available_count,
+    occupied: parkingData.occupied_count,
+    floors: floors.length,
+    buildings: 1 // ถ้ามีข้อมูล building ใน API ก็ปรับเพิ่ม
+  };
 
   const occupancyRate =
     overview.total === 0
       ? 0
-      : Math.round(((overview.total - overview.available) / overview.total) * 100);
+      : Math.round((overview.occupied / overview.total) * 100);
 
-  const floorAvailability = (total: number, available: number) =>
-    total === 0 ? 0 : Math.round((available / total) * 100);
+  const floorAvailability = (spots: ParkingSpot[]) => {
+    const available = spots.filter(s => s.is_occupied === 0).length;
+    return spots.length === 0 ? 0 : Math.round((available / spots.length) * 100);
+  };
 
-  const floorUsage = (total: number, available: number) =>
-    total === 0 ? 0 : Math.round(((total - available) / total) * 100);
+  const floorUsage = (spots: ParkingSpot[]) => {
+    const occupied = spots.filter(s => s.is_occupied === 1).length;
+    return spots.length === 0 ? 0 : Math.round((occupied / spots.length) * 100);
+  };
 
   const mostAvailableFloor = floors.reduce((best, floor) => {
-    if (!best) {
-      return floor;
-    }
-    return floorAvailability(floor.total, floor.available) >
-      floorAvailability(best.total, best.available)
-      ? floor
-      : best;
+    if (!best) return floor;
+    return floorAvailability(floor.spots) > floorAvailability(best.spots) ? floor : best;
   }, floors[0]);
 
   const busiestFloor = floors.reduce((best, floor) => {
-    if (!best) {
-      return floor;
-    }
-    return floorUsage(floor.total, floor.available) >
-      floorUsage(best.total, best.available)
-      ? floor
-      : best;
+    if (!best) return floor;
+    return floorUsage(floor.spots) > floorUsage(best.spots) ? floor : best;
   }, floors[0]);
 
   return (
@@ -102,7 +185,7 @@ export default async function Home() {
               Occupied
             </p>
             <p className="mt-4 text-3xl font-semibold text-stone-900">
-              {overview.total - overview.available}
+              {overview.occupied}
             </p>
             <p className="mt-2 text-sm text-stone-500">อัปเดตจากเซนเซอร์</p>
           </div>
@@ -129,16 +212,10 @@ export default async function Home() {
             </p>
             <h3 className="mt-3 text-xl text-stone-900">ชั้นที่ว่างที่สุด</h3>
             <p className="mt-2 text-sm text-stone-500">
-              {mostAvailableFloor?.name} ({mostAvailableFloor?.buildingName})
+              {mostAvailableFloor?.floor_name}
             </p>
             <p className="mt-4 text-2xl font-semibold text-emerald-700">
-              {mostAvailableFloor
-                ? floorAvailability(
-                    mostAvailableFloor.total,
-                    mostAvailableFloor.available
-                  )
-                : 0}
-              %
+              {mostAvailableFloor ? floorAvailability(mostAvailableFloor.spots) : 0}%
             </p>
           </div>
           <div className="glass-panel rounded-3xl p-6">
@@ -147,136 +224,112 @@ export default async function Home() {
             </p>
             <h3 className="mt-3 text-xl text-stone-900">ชั้นที่แน่นที่สุด</h3>
             <p className="mt-2 text-sm text-stone-500">
-              {busiestFloor?.name} ({busiestFloor?.buildingName})
+              {busiestFloor?.floor_name}
             </p>
             <p className="mt-4 text-2xl font-semibold text-stone-900">
-              {busiestFloor
-                ? floorUsage(busiestFloor.total, busiestFloor.available)
-                : 0}
-              %
+              {busiestFloor ? floorUsage(busiestFloor.spots) : 0}%
             </p>
           </div>
         </section>
 
         <section className="space-y-6">
-          {data.buildings.map((building) => {
-            const buildingTotals = building.floors.reduce(
-              (acc, floor) => {
-                acc.total += floor.total;
-                acc.available += floor.available;
-                return acc;
-              },
-              { total: 0, available: 0 }
-            );
-
-            const buildingAvailableRate =
-              buildingTotals.total === 0
-                ? 0
-                : Math.round(
-                    (buildingTotals.available / buildingTotals.total) * 100
-                  );
-
-            return (
-              <div key={building.id} className="glass-panel rounded-[32px] p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-stone-500">
-                      Building
-                    </p>
-                    <h2 className="mt-2 text-2xl text-stone-900">
-                      {building.name}
-                    </h2>
-                    <p className="mt-1 text-sm text-stone-500">
-                      {building.location}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700">
-                      รวม {buildingTotals.total} ช่อง
-                    </div>
-                    <div className="rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-semibold text-emerald-700">
-                      ว่าง {buildingTotals.available} ช่อง
-                    </div>
-                    <div className="rounded-2xl bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-700">
-                      ว่าง {buildingAvailableRate}%
-                    </div>
-                  </div>
+          <div className="glass-panel rounded-[32px] p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-stone-500">
+                  Building
+                </p>
+                <h2 className="mt-2 text-2xl text-stone-900">
+                  MUICT Building
+                </h2>
+                <p className="mt-1 text-sm text-stone-500">
+                  Main Campus
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700">
+                  รวม {overview.total} ช่อง
                 </div>
-
-                <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {building.floors.map((floor) => {
-                    const occupied = floor.total - floor.available;
-                    const availabilityRate =
-                      floor.total === 0
-                        ? 0
-                        : Math.round((floor.available / floor.total) * 100);
-
-                    return (
-                      <div
-                        key={floor.id}
-                        className="rounded-3xl border border-stone-200/80 bg-white/90 p-5 shadow-sm"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="text-sm font-semibold text-stone-500">
-                              {floor.name}
-                            </p>
-                            <p className="mt-2 text-2xl font-semibold text-stone-900">
-                              {floor.available}
-                              <span className="text-sm font-medium text-stone-500">
-                                /{floor.total}
-                              </span>
-                            </p>
-                            <p className="mt-1 text-xs text-stone-400">
-                              อัปเดต {floor.updatedAt} น.
-                            </p>
-                          </div>
-                          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                            ว่าง {availabilityRate}%
-                          </span>
-                        </div>
-
-                        <div className="mt-4 h-2 w-full rounded-full bg-stone-200">
-                          <div
-                            className="h-full rounded-full bg-emerald-500"
-                            style={{ width: `${availabilityRate}%` }}
-                          />
-                        </div>
-
-                        <div className="mt-4 flex items-center justify-between text-xs text-stone-500">
-                          <span>จอดแล้ว {occupied} คัน</span>
-                          <span>เหลือ {floor.available} ช่อง</span>
-                        </div>
-
-                        <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex gap-2">
-                            {floor.slots.map((slot) => (
-                              <span
-                                key={slot.id}
-                                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                                  slot.status === "available"
-                                    ? "bg-emerald-100 text-emerald-700"
-                                    : "bg-stone-100 text-stone-500"
-                                }`}
-                              >
-                                {slot.id}
-                              </span>
-                            ))}
-                          </div>
-                          <Link
-                            href={`/floor/${floor.id}`}
-                            className="rounded-full bg-stone-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-stone-800"
-                          >
-                            ดูช่องจอด
-                          </Link>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-semibold text-emerald-700">
+                  ว่าง {overview.available} ช่อง
+                </div>
+                <div className="rounded-2xl bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-700">
+                  ว่าง {Math.round((overview.available / overview.total) * 100)}%
                 </div>
               </div>
-            );
-          })}
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {floors.map((floor) => {
+                const available = floor.spots.filter(s => s.is_occupied === 0).length;
+                const occupied = floor.spots.filter(s => s.is_occupied === 1).length;
+                const total = floor.spots.length;
+                const availabilityRate = total === 0 ? 0 : Math.round((available / total) * 100);
+
+                return (
+                  <div
+                    key={floor.floor_id}
+                    className="rounded-3xl border border-stone-200/80 bg-white/90 p-5 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-stone-500">
+                          {floor.floor_name}
+                        </p>
+                        <p className="mt-2 text-2xl font-semibold text-stone-900">
+                          {available}
+                          <span className="text-sm font-medium text-stone-500">
+                            /{total}
+                          </span>
+                        </p>
+                        <p className="mt-1 text-xs text-stone-400">
+                          อัปเดตล่าสุด
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                        ว่าง {availabilityRate}%
+                      </span>
+                    </div>
+
+                    <div className="mt-4 h-2 w-full rounded-full bg-stone-200">
+                      <div
+                        className="h-full rounded-full bg-emerald-500"
+                        style={{ width: `${availabilityRate}%` }}
+                      />
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between text-xs text-stone-500">
+                      <span>จอดแล้ว {occupied} คัน</span>
+                      <span>เหลือ {available} ช่อง</span>
+                    </div>
+
+                    <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex gap-2">
+                        {floor.spots.slice(0, 5).map((spot) => (
+                          <span
+                            key={spot.id}
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                              spot.is_occupied === 0
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-stone-100 text-stone-500"
+                            }`}
+                          >
+                            {spot.spot_number}
+                          </span>
+                        ))}
+                      </div>
+                      <Link
+                        href={`/floor/${floor.floor_id}`}
+                        className="rounded-full bg-stone-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-stone-800"
+                      >
+                        ดูช่องจอด
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </section>
       </main>
     </div>

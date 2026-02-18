@@ -1,12 +1,12 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
+"use client";
+import { notFound, useRouter } from "next/navigation";
 import PaymentModal from "@/components/PaymentModal";
+import { useEffect, useState, use } from "react";
 
 type PageProps = {
   params: Promise<{ receiptId: string }>;
 };
 
-// ฟังก์ชัน delay สำหรับ test loading
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 type Receipt = {
@@ -18,36 +18,33 @@ type Receipt = {
   plateNumber?: string;
 };
 
-// Mock data - ในอนาคตจะดึงจาก API
-const mockReceipts: Record<string, Receipt> = {
-  "RCP001": {
-    id: "RCP001",
-    slotId: "A1",
-    floorName: "ชั้น L1",
-    buildingName: "อาคาร A - Central Lot",
-    entryTime: "2026-02-16T07:30:00+07:00",
-    plateNumber: "กข 1234",
-  },
-  "RCP002": {
-    id: "RCP002",
-    slotId: "A3",
-    floorName: "ชั้น L1",
-    buildingName: "อาคาร A - Central Lot",
-    entryTime: "2026-02-16T08:15:00+07:00",
-    plateNumber: "กง 5678",
-  },
+type ApiTransaction = {
+  id: number;
+  license_plate: string;
+  building: string;
+  building_id: number | null;
+  image_path: string | null;
+  entry_time: string;
+  exit_time: string | null;
+  qr_token: string;
+  status: string;
+  fee: number | null;
+};
+
+type ApiResponse = {
+  status: string;
+  count: number;
+  transactions: ApiTransaction[];
 };
 
 const calculateParkingFee = (entryTime: Date, exitTime: Date) => {
   const durationMs = exitTime.getTime() - entryTime.getTime();
   const durationHours = durationMs / (1000 * 60 * 60);
   
-  // 1 ชม. แรกฟรี
   if (durationHours <= 1) {
     return { hours: durationHours, fee: 0, freeHour: true };
   }
   
-  // ชม. ต่อไป 20 บาท/ชม. (คิดแบบเศษชั่วโมง)
   const billableHours = Math.ceil(durationHours - 1);
   const fee = billableHours * 20;
   
@@ -87,14 +84,82 @@ const formatShortTime = (date: Date) => {
   });
 };
 
-export default async function ReceiptPage({ params }: PageProps) {
+export default function ReceiptPage({ params }: PageProps) {
+  const rawReceiptId = use(params).receiptId;
+  let receiptId = rawReceiptId;
+  try {
+    while (receiptId.includes('%')) {
+      receiptId = decodeURIComponent(receiptId);
+    }
+  } catch (e) {
+    receiptId = rawReceiptId;
+  }
   
-  const { receiptId } = await params;
-  const receipt = mockReceipts[receiptId];
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchData = async () => {
+      try {
+        // เรียก Next.js API Route แทนเพื่อหลีกเลี่ยง CORS
+        const response = await fetch(`/api/transactions?license_plate=${encodeURIComponent(receiptId)}`);
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+
+        const data: ApiResponse = await response.json();
+
+        if (isMounted && data && data.transactions && data.transactions.length > 0) {
+          const transaction = data.transactions[0];
+          setReceipt({
+            id: transaction.id.toString(),
+            slotId: "-",
+            floorName: "-",
+            buildingName: transaction.building,
+            entryTime: transaction.entry_time,
+            plateNumber: transaction.license_plate,
+          });
+        } else if (isMounted) {
+          setReceipt(null);
+        }
+      } catch (error) {
+        console.error('Error fetching transaction data:', error);
+        if (isMounted) {
+          setReceipt(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [receiptId]);
+
+  if (loading) {
+    return (
+      <div className="dashboard-bg min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-stone-900 border-r-transparent"></div>
+          <p className="mt-4 text-stone-600">กำลังโหลดข้อมูล...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!receipt) {
     notFound();
   }
+  
+  // receiptId คือ license_plate ที่ส่งมาจาก path เช่น /receipt/กข1020
 
   const entryTime = new Date(receipt.entryTime);
   const currentTime = new Date(); // ในอนาคตอาจจะมาจาก API

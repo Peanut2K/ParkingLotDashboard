@@ -1,32 +1,99 @@
+"use client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { findFloorById, mockParkingData } from "@/data/parking-data";
+import { useEffect, useState, use } from "react";
 
 type PageProps = {
   params: Promise<{ floorId: string }>;
 };
 
+type ParkingSpot = {
+  id: number;
+  floor_id: number;
+  spot_number: string;
+  is_occupied: number;
+  camera_url: string | null;
+  last_update: string;
+  floor_name: string;
+};
+
+type ApiResponse = {
+  status: string;
+  count: number;
+  available_count: number;
+  occupied_count: number;
+  parking_spots: ParkingSpot[];
+};
+
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export default async function FloorDetailPage({ params }: PageProps) {
-  
-  const { floorId } = await params;
-  const floor = findFloorById(mockParkingData, floorId);
+export default function FloorDetailPage({ params }: PageProps) {
+  const { floorId } = use(params);
+  const [parkingData, setParkingData] = useState<ApiResponse | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!floor) {
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchData = async () => {
+      try {
+        const response = await fetch(`/api/parking-spots?floor_id=${floorId}`);
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+
+        const data: ApiResponse = await response.json();
+        
+        if (isMounted) {
+          setParkingData(data);
+        }
+      } catch (error) {
+        console.error('Error fetching floor data:', error);
+        if (isMounted) {
+          setParkingData(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [floorId]);
+
+  if (loading) {
+    return (
+      <div className="dashboard-bg min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-stone-900 border-r-transparent"></div>
+          <p className="mt-4 text-stone-600">กำลังโหลดข้อมูล...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!parkingData || parkingData.parking_spots.length === 0) {
     notFound();
   }
 
-  const occupied = floor.total - floor.available;
-  const availabilityRate =
-    floor.total === 0 ? 0 : Math.round((floor.available / floor.total) * 100);
+  const floor = parkingData.parking_spots[0];
+  const total = parkingData.count;
+  const available = parkingData.available_count;
+  const occupied = parkingData.occupied_count;
+  const availabilityRate = total === 0 ? 0 : Math.round((available / total) * 100);
   const occupancyRate = 100 - availabilityRate;
 
-  const availableSlots = floor.slots.filter(
-    (slot) => slot.status === "available"
+  const availableSlots = parkingData.parking_spots.filter(
+    (spot) => spot.is_occupied === 0
   );
-  const occupiedSlots = floor.slots.filter(
-    (slot) => slot.status === "occupied"
+  const occupiedSlots = parkingData.parking_spots.filter(
+    (spot) => spot.is_occupied === 1
   );
 
   return (
@@ -58,10 +125,10 @@ export default async function FloorDetailPage({ params }: PageProps) {
               Live now
             </div>
             <h1 className="text-4xl leading-tight text-stone-900 sm:text-5xl">
-              {floor.name}
+              {floor.floor_name}
             </h1>
             <p className="max-w-2xl text-base text-stone-600 sm:text-lg">
-              {floor.buildingName} · {floor.buildingLocation}
+              MUICT Building · Main Campus
             </p>
           </div>
         </header>
@@ -73,7 +140,7 @@ export default async function FloorDetailPage({ params }: PageProps) {
             </p>
             <h3 className="mt-3 text-xl text-stone-900">อัตราที่ว่าง</h3>
             <p className="mt-2 text-sm text-stone-500">
-              {floor.name} ({floor.buildingName})
+              {floor.floor_name}
             </p>
             <p className="mt-4 text-2xl font-semibold text-emerald-700">
               {availabilityRate}%
@@ -85,7 +152,7 @@ export default async function FloorDetailPage({ params }: PageProps) {
             </p>
             <h3 className="mt-3 text-xl text-stone-900">อัตราการใช้งาน</h3>
             <p className="mt-2 text-sm text-stone-500">
-              {floor.name} ({floor.buildingName})
+              {floor.floor_name}
             </p>
             <p className="mt-4 text-2xl font-semibold text-stone-900">
               {occupancyRate}%
@@ -101,18 +168,18 @@ export default async function FloorDetailPage({ params }: PageProps) {
                   สรุปชั้นนี้
                 </p>
                 <h2 className="mt-2 text-2xl text-stone-900">
-                  {floor.name} - {floor.buildingName}
+                  {floor.floor_name}
                 </h2>
                 <p className="mt-1 text-sm text-stone-500">
-                  อัปเดตล่าสุด {floor.updatedAt} น.
+                  อัปเดตล่าสุด
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
                 <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700">
-                  รวม {floor.total} ช่อง
+                  รวม {total} ช่อง
                 </div>
                 <div className="rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-semibold text-emerald-700">
-                  ว่าง {floor.available} ช่อง
+                  ว่าง {available} ช่อง
                 </div>
                 <div className="rounded-2xl bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-700">
                   จอดแล้ว {occupied} คัน
@@ -134,10 +201,10 @@ export default async function FloorDetailPage({ params }: PageProps) {
                 สถานะช่องจอด
               </p>
               <h2 className="mt-2 text-2xl text-stone-900">
-                ช่องจอดทั้งหมด {floor.slots.length} ช่อง
+                ช่องจอดทั้งหมด {total} ช่อง
               </h2>
               <p className="mt-1 text-sm text-stone-500">
-                ต่อจาก API: {mockParkingData.fetchedAt}
+                อัปเดตล่าสุด
               </p>
             </div>
 
@@ -152,13 +219,13 @@ export default async function FloorDetailPage({ params }: PageProps) {
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                  {availableSlots.map((slot) => (
+                  {availableSlots.map((spot) => (
                     <div
-                      key={slot.id}
+                      key={spot.id}
                       className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-5 text-center transition hover:border-emerald-300 hover:bg-emerald-100"
                     >
                       <span className="text-xl font-bold text-emerald-700">
-                        {slot.id}
+                        {spot.spot_number}
                       </span>
                       <span className="text-xs font-semibold text-emerald-600">
                         ว่าง
@@ -179,13 +246,13 @@ export default async function FloorDetailPage({ params }: PageProps) {
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                    {occupiedSlots.map((slot) => (
+                    {occupiedSlots.map((spot) => (
                       <div
-                        key={slot.id}
+                        key={spot.id}
                         className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-stone-100 px-4 py-5 text-center"
                       >
                         <span className="text-xl font-bold text-stone-600">
-                          {slot.id}
+                          {spot.spot_number}
                         </span>
                         <span className="text-xs font-semibold text-stone-500">
                           ไม่ว่าง
