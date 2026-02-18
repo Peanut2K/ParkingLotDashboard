@@ -2,6 +2,7 @@
 import { notFound, useRouter } from "next/navigation";
 import PaymentModal from "@/components/PaymentModal";
 import { useEffect, useState, use } from "react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 type PageProps = {
   params: Promise<{ receiptId: string }>;
@@ -145,14 +146,7 @@ export default function ReceiptPage({ params }: PageProps) {
   }, [receiptId]);
 
   if (loading) {
-    return (
-      <div className="dashboard-bg min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-stone-900 border-r-transparent"></div>
-          <p className="mt-4 text-stone-600">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (!receipt) {

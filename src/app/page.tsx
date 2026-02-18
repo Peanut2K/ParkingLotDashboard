@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 type ParkingSpot = {
   id: number;
@@ -59,14 +60,7 @@ export default function Home() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="dashboard-bg min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-stone-900 border-r-transparent"></div>
-          <p className="mt-4 text-stone-600">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (!parkingData) {
