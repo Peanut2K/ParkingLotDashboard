@@ -3,12 +3,10 @@ export async function GET(request: Request) {
   const floor_id = searchParams.get('floor_id');
 
   try {
-    // ใช้ API_URL สำหรับ server-side (ไม่ใช่ NEXT_PUBLIC_)
+    // Use API_URL for server-side (not NEXT_PUBLIC_)
     const apiUrl = process.env.API_URL || 'http://localhost:8000';
     let url = `${apiUrl}/parking-spots`;
     
-    console.log('Backend API URL:', url);
-
     if (floor_id) {
       url += `?floor_id=${encodeURIComponent(floor_id)}`;
     }

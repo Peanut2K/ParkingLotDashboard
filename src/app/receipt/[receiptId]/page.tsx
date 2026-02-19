@@ -57,16 +57,16 @@ const formatDuration = (hours: number) => {
   const m = Math.round((hours - h) * 60);
   
   if (h === 0) {
-    return `${m} นาที`;
+    return `${m} min`;
   }
   if (m === 0) {
-    return `${h} ชั่วโมง`;
+    return `${h} hr`;
   }
-  return `${h} ชั่วโมง ${m} นาที`;
+  return `${h} hr ${m} min`;
 };
 
 const formatTime = (date: Date) => {
-  return date.toLocaleString("th-TH", {
+  return date.toLocaleString("en-US", {
     timeZone: "Asia/Bangkok",
     year: "numeric",
     month: "long",
@@ -78,7 +78,7 @@ const formatTime = (date: Date) => {
 };
 
 const formatShortTime = (date: Date) => {
-  return date.toLocaleTimeString("th-TH", {
+  return date.toLocaleTimeString("en-US", {
     timeZone: "Asia/Bangkok",
     hour: "2-digit",
     minute: "2-digit",
@@ -104,7 +104,7 @@ export default function ReceiptPage({ params }: PageProps) {
 
     const fetchData = async () => {
       try {
-        // เรียก Next.js API Route แทนเพื่อหลีกเลี่ยง CORS
+        // Call Next.js API Route proxy to avoid CORS
         const response = await fetch(`/api/transactions?license_plate=${encodeURIComponent(receiptId)}`);
         
         if (!response.ok) {
@@ -153,10 +153,10 @@ export default function ReceiptPage({ params }: PageProps) {
     notFound();
   }
   
-  // receiptId คือ license_plate ที่ส่งมาจาก path เช่น /receipt/กข1020
+  // receiptId is the license_plate from the path e.g. /receipt/ABC1234
 
   const entryTime = new Date(receipt.entryTime);
-  const currentTime = new Date(); // ในอนาคตอาจจะมาจาก API
+  const currentTime = new Date(); // in the future this could come from API
   const pricing = calculateParkingFee(entryTime, currentTime);
 
   return (
@@ -194,10 +194,10 @@ export default function ReceiptPage({ params }: PageProps) {
                   Active
                 </div>
                 <h1 className="mt-4 text-3xl text-stone-900 sm:text-4xl">
-                  ใบเสร็จการจอดรถ
+                  Parking Receipt
                 </h1>
                 <p className="mt-2 text-sm text-stone-500">
-                  เลขที่: {receipt.id}
+                  Receipt No: {receipt.id}
                 </p>
               </div>
               <div className="text-right">
@@ -224,14 +224,14 @@ export default function ReceiptPage({ params }: PageProps) {
             <div className="space-y-6">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
-                  รายละเอียดการจอด
+                  Parking Details
                 </p>
               </div>
 
               <div className="grid gap-6 sm:grid-cols-2">
                 <div className="rounded-2xl bg-stone-50 p-5">
                   <p className="text-sm font-semibold text-stone-500">
-                    ช่องจอด
+                    Parking Spot
                   </p>
                   <p className="mt-2 text-2xl font-bold text-stone-900">
                     {receipt.slotId}
@@ -241,7 +241,7 @@ export default function ReceiptPage({ params }: PageProps) {
                   </p>
                 </div>
                 <div className="rounded-2xl bg-stone-50 p-5">
-                  <p className="text-sm font-semibold text-stone-500">สถานที่</p>
+                  <p className="text-sm font-semibold text-stone-500">Location</p>
                   <p className="mt-2 text-lg font-semibold text-stone-900">
                     {receipt.buildingName}
                   </p>
@@ -251,7 +251,7 @@ export default function ReceiptPage({ params }: PageProps) {
               {receipt.plateNumber && (
                 <div className="rounded-2xl border-2 border-stone-900 bg-white p-4">
                   <p className="text-xs font-semibold text-stone-500">
-                    ทะเบียนรถ
+                    License Plate
                   </p>
                   <p className="mt-1 text-center text-3xl font-bold tracking-wider text-stone-900">
                     {receipt.plateNumber}
@@ -265,7 +265,7 @@ export default function ReceiptPage({ params }: PageProps) {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-semibold text-stone-500">
-                    เวลาเข้า
+                    Entry Time
                   </p>
                   <p className="mt-1 text-lg font-semibold text-stone-900">
                     {formatShortTime(entryTime)}
@@ -291,7 +291,7 @@ export default function ReceiptPage({ params }: PageProps) {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-semibold text-stone-500">
-                    เวลาปัจจุบัน
+                    Current Time
                   </p>
                   <p className="mt-1 text-lg font-semibold text-stone-900">
                     {formatShortTime(currentTime)}
@@ -305,7 +305,7 @@ export default function ReceiptPage({ params }: PageProps) {
               <div className="rounded-2xl bg-emerald-50 p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-emerald-700">
-                    ระยะเวลาจอด
+                    Duration
                   </p>
                   <p className="text-2xl font-bold text-emerald-900">
                     {formatDuration(pricing.hours)}
@@ -318,22 +318,22 @@ export default function ReceiptPage({ params }: PageProps) {
             <div className="space-y-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
-                  รายละเอียดค่าบริการ
+                  Pricing Details
                 </p>
               </div>
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-stone-600">1 ชั่วโมงแรก</span>
-                  <span className="font-semibold text-emerald-700">ฟรี</span>
+                  <span className="text-stone-600">First 1 hour</span>
+                  <span className="font-semibold text-emerald-700">Free</span>
                 </div>
                 {pricing.billableHours && pricing.billableHours > 0 && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-stone-600">
-                      เวลาเพิ่มเติม ({pricing.billableHours} ชั่วโมง × 20 บาท)
+                      Additional time ({pricing.billableHours} hr × ฿20)
                     </span>
                     <span className="font-semibold text-stone-900">
-                      {pricing.billableHours * 20} บาท
+                      ฿{pricing.billableHours * 20}
                     </span>
                   </div>
                 )}
@@ -343,11 +343,11 @@ export default function ReceiptPage({ params }: PageProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold text-stone-400">
-                      ยอดชำระทั้งหมด
+                      Total Amount
                     </p>
                     {pricing.freeHour && (
                       <p className="mt-1 text-xs text-stone-500">
-                        🎉 ฟรี! ภายใน 1 ชั่วโมง
+                        🎉 Free! Within 1 hour
                       </p>
                     )}
                   </div>
@@ -383,18 +383,17 @@ export default function ReceiptPage({ params }: PageProps) {
                   </svg>
                   <div>
                     <p className="text-sm font-semibold text-amber-900">
-                      ข้อมูลสำคัญ
+                      Important Information
                     </p>
                     <p className="mt-1 text-xs text-amber-800">
-                      กรุณาเก็บใบเสร็จนี้ไว้เพื่อแสดงเมื่อออกจากลานจอดรถ
-                      ค่าบริการคำนวณแบบปัดชั่วโมง (เศษของชั่วโมงคิดเป็น 1 ชั่วโมง)
+                      Please keep this receipt to present when leaving the parking lot. Fees are calculated by rounding up to the nearest hour.
                     </p>
                   </div>
                 </div>
               </div>
 
               <div className="text-center text-xs text-stone-400">
-                <p>สอบถามข้อมูลเพิ่มเติม: 02-XXX-XXXX</p>
+                <p>Contact: 02-XXX-XXXX</p>
                 <p className="mt-1">ParkingLot Dashboard © 2026</p>
               </div>
             </div>

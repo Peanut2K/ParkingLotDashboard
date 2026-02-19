@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 type PaymentModalProps = {
   fee: number;
@@ -11,7 +12,7 @@ export default function PaymentModal({ fee, receiptId }: PaymentModalProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   if (fee === 0) {
-    return null; // ไม่แสดงปุ่มถ้าฟรี
+    return null; // Don't show button if free
   }
 
   return (
@@ -20,26 +21,26 @@ export default function PaymentModal({ fee, receiptId }: PaymentModalProps) {
         onClick={() => setIsOpen(true)}
         className="w-full rounded-2xl bg-emerald-600 px-6 py-4 text-lg font-semibold text-white transition hover:bg-emerald-700 active:scale-[0.98]"
       >
-        💳 ชำระเงิน ฿{fee}
+        💳 Pay ฿{fee}
       </button>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
           onClick={() => setIsOpen(false)}
         >
           <div
-            className="glass-panel w-full max-w-md rounded-3xl p-8"
+            className="glass-panel w-full max-w-md rounded-3xl p-8 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="space-y-6">
               <div className="flex items-start justify-between">
                 <div>
                   <h2 className="text-2xl font-semibold text-stone-900">
-                    ชำระค่าบริการ
+                    Payment
                   </h2>
                   <p className="mt-1 text-sm text-stone-500">
-                    สแกน QR Code เพื่อชำระเงิน
+                    Scan QR Code to pay
                   </p>
                 </div>
                 <button
@@ -64,7 +65,7 @@ export default function PaymentModal({ fee, receiptId }: PaymentModalProps) {
 
               <div className="rounded-2xl bg-white p-6">
                 <div className="mx-auto aspect-square w-full max-w-[280px] rounded-xl border-4 border-stone-200 bg-gradient-to-br from-emerald-50 to-stone-50 p-4">
-                  {/* QR Code Placeholder - ในอนาคตจะแทนด้วย QR จริง */}
+                  {/* QR Code Placeholder - will be replaced with real QR */}
                   <div className="flex h-full w-full flex-col items-center justify-center gap-3">
                     <svg
                       className="h-32 w-32 text-stone-300"
@@ -80,7 +81,7 @@ export default function PaymentModal({ fee, receiptId }: PaymentModalProps) {
                       />
                     </svg>
                     <p className="text-center text-sm font-semibold text-stone-400">
-                      QR Code สำหรับชำระเงิน
+                      QR Code for Payment
                     </p>
                     <p className="text-xs text-stone-400">{receiptId}</p>
                   </div>
@@ -90,7 +91,7 @@ export default function PaymentModal({ fee, receiptId }: PaymentModalProps) {
               <div className="space-y-4 rounded-2xl bg-stone-50 p-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-stone-600">
-                    เลขที่ใบเสร็จ
+                    Receipt No.
                   </span>
                   <span className="font-mono text-sm font-semibold text-stone-900">
                     {receiptId}
@@ -98,7 +99,7 @@ export default function PaymentModal({ fee, receiptId }: PaymentModalProps) {
                 </div>
                 <div className="flex items-center justify-between border-t border-stone-200 pt-4">
                   <span className="text-base font-semibold text-stone-700">
-                    ยอดชำระ
+                    Total
                   </span>
                   <span className="text-2xl font-bold text-emerald-700">
                     ฿{fee}
@@ -123,7 +124,7 @@ export default function PaymentModal({ fee, receiptId }: PaymentModalProps) {
                   </svg>
                   <div>
                     <p className="text-xs text-blue-900">
-                      รองรับ PromptPay · TrueMoney · LINE Pay · ShopeePay
+                      Supports PromptPay · TrueMoney · LINE Pay · ShopeePay
                     </p>
                   </div>
                 </div>
@@ -133,12 +134,12 @@ export default function PaymentModal({ fee, receiptId }: PaymentModalProps) {
                 onClick={() => setIsOpen(false)}
                 className="w-full rounded-2xl border-2 border-stone-200 bg-white px-6 py-3 text-sm font-semibold text-stone-700 transition hover:border-stone-300 hover:bg-stone-50"
               >
-                ปิด
+                Close
               </button>
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </>
   );
 }

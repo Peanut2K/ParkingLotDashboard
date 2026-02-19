@@ -26,46 +26,31 @@ type ApiResponse = {
   parking_spots: ParkingSpot[];
 };
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
 export default function FloorDetailPage({ params }: PageProps) {
   const { floorId } = use(params);
   const [parkingData, setParkingData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
+    const eventSource = new EventSource(`/api/parking-spots/stream?floor_id=${floorId}`);
 
-    const fetchData = async () => {
+    eventSource.onmessage = (e) => {
       try {
-        const response = await fetch(`/api/parking-spots?floor_id=${floorId}`);
-        
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
-        }
-
-        const data: ApiResponse = await response.json();
-        
-        if (isMounted) {
-          setParkingData(data);
-        }
-      } catch (error) {
-        console.error('Error fetching floor data:', error);
-        if (isMounted) {
-          setParkingData(null);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        const data: ApiResponse = JSON.parse(e.data);
+        setParkingData(data);
+        setLoading(false);
+      } catch {
+        console.error('Error parsing SSE data');
       }
     };
 
-    fetchData();
-
-    return () => {
-      isMounted = false;
+    eventSource.onerror = () => {
+      console.error('SSE connection error');
+      setLoading(false);
+      eventSource.close();
     };
+
+    return () => eventSource.close();
   }, [floorId]);
 
   if (loading) {
@@ -111,7 +96,7 @@ export default function FloorDetailPage({ params }: PageProps) {
                 d="M10 19l-7-7m0 0l7-7m-7 7h18"
               />
             </svg>
-            กลับหน้าหลัก
+            Back to Home
           </Link>
           <div className="mt-6 space-y-3">
             <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
@@ -132,7 +117,7 @@ export default function FloorDetailPage({ params }: PageProps) {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
               Insight
             </p>
-            <h3 className="mt-3 text-xl text-stone-900">อัตราที่ว่าง</h3>
+            <h3 className="mt-3 text-xl text-stone-900">Availability Rate</h3>
             <p className="mt-2 text-sm text-stone-500">
               {floor.floor_name}
             </p>
@@ -144,7 +129,7 @@ export default function FloorDetailPage({ params }: PageProps) {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
               Insight
             </p>
-            <h3 className="mt-3 text-xl text-stone-900">อัตราการใช้งาน</h3>
+            <h3 className="mt-3 text-xl text-stone-900">Occupancy Rate</h3>
             <p className="mt-2 text-sm text-stone-500">
               {floor.floor_name}
             </p>
@@ -159,24 +144,24 @@ export default function FloorDetailPage({ params }: PageProps) {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-stone-500">
-                  สรุปชั้นนี้
+                  Floor Summary
                 </p>
                 <h2 className="mt-2 text-2xl text-stone-900">
                   {floor.floor_name}
                 </h2>
                 <p className="mt-1 text-sm text-stone-500">
-                  อัปเดตล่าสุด
+                  Last updated
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
                 <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700">
-                  รวม {total} ช่อง
+                  Total {total} slots
                 </div>
                 <div className="rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-semibold text-emerald-700">
-                  ว่าง {available} ช่อง
+                  {available} available
                 </div>
                 <div className="rounded-2xl bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-700">
-                  จอดแล้ว {occupied} คัน
+                  {occupied} occupied
                 </div>
               </div>
             </div>
@@ -192,13 +177,13 @@ export default function FloorDetailPage({ params }: PageProps) {
           <div className="glass-panel rounded-[32px] p-6">
             <div className="mb-6">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-stone-500">
-                สถานะช่องจอด
+                Parking Spot Status
               </p>
               <h2 className="mt-2 text-2xl text-stone-900">
-                ช่องจอดทั้งหมด {total} ช่อง
+                All {total} Parking Spots
               </h2>
               <p className="mt-1 text-sm text-stone-500">
-                อัปเดตล่าสุด
+                Last updated
               </p>
             </div>
 
@@ -206,10 +191,10 @@ export default function FloorDetailPage({ params }: PageProps) {
               <div>
                 <div className="mb-3 flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-emerald-700">
-                    ช่องว่าง ({availableSlots.length})
+                    Available ({availableSlots.length})
                   </h3>
                   <span className="text-xs text-stone-500">
-                    พร้อมใช้งานทันที
+                    Ready to use
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -222,7 +207,7 @@ export default function FloorDetailPage({ params }: PageProps) {
                         {spot.spot_number}
                       </span>
                       <span className="text-xs font-semibold text-emerald-600">
-                        ว่าง
+                        Available
                       </span>
                     </div>
                   ))}
@@ -233,10 +218,10 @@ export default function FloorDetailPage({ params }: PageProps) {
                 <div>
                   <div className="mb-3 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-stone-700">
-                      ช่องไม่ว่าง ({occupiedSlots.length})
+                      Occupied ({occupiedSlots.length})
                     </h3>
                     <span className="text-xs text-stone-500">
-                      มีรถจอดอยู่
+                      Car parked
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -249,7 +234,7 @@ export default function FloorDetailPage({ params }: PageProps) {
                           {spot.spot_number}
                         </span>
                         <span className="text-xs font-semibold text-stone-500">
-                          ไม่ว่าง
+                          Occupied
                         </span>
                       </div>
                     ))}

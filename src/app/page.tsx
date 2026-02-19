@@ -21,42 +21,30 @@ type ApiResponse = {
   parking_spots: ParkingSpot[];
 };
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
 export default function Home() {
   const [parkingData, setParkingData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
+    const eventSource = new EventSource('/api/parking-spots/stream');
 
-    const fetchData = async () => {
+    eventSource.onmessage = (e) => {
       try {
-        const response = await fetch('/api/parking-spots');
-        
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
-        }
-
-        const data: ApiResponse = await response.json();
-        
-        if (isMounted) {
-          setParkingData(data);
-        }
-      } catch (error) {
-        console.error('Error fetching parking data:', error);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        const data: ApiResponse = JSON.parse(e.data);
+        setParkingData(data);
+        setLoading(false);
+      } catch {
+        console.error('Error parsing SSE data');
       }
     };
 
-    fetchData();
-
-    return () => {
-      isMounted = false;
+    eventSource.onerror = () => {
+      console.error('SSE connection error');
+      setLoading(false);
+      eventSource.close();
     };
+
+    return () => eventSource.close();
   }, []);
 
   if (loading) {
@@ -67,13 +55,13 @@ export default function Home() {
     return (
       <div className="dashboard-bg min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-stone-600">ไม่สามารถโหลดข้อมูลได้</p>
+          <p className="text-stone-600">Unable to load data</p>
         </div>
       </div>
     );
   }
 
-  // จัดกลุ่มข้อมูลตาม floor
+  // Group data by floor
   const floorGroups = parkingData.parking_spots.reduce((acc, spot) => {
     if (!acc[spot.floor_id]) {
       acc[spot.floor_id] = {
@@ -93,7 +81,7 @@ export default function Home() {
     available: parkingData.available_count,
     occupied: parkingData.occupied_count,
     floors: floors.length,
-    buildings: 1 // ถ้ามีข้อมูล building ใน API ก็ปรับเพิ่ม
+    buildings: 1 // adjust if building data is available from API
   };
 
   const occupancyRate =
@@ -162,7 +150,7 @@ export default function Home() {
               {overview.total}
             </p>
             <p className="mt-2 text-sm text-stone-500">
-              ครอบคลุม {overview.buildings} ตึก, {overview.floors} ชั้น
+              Across {overview.buildings} building, {overview.floors} floors
             </p>
           </div>
           <div className="glass-panel rounded-3xl p-5">
@@ -172,7 +160,7 @@ export default function Home() {
             <p className="mt-4 text-3xl font-semibold text-emerald-700">
               {overview.available}
             </p>
-            <p className="mt-2 text-sm text-stone-500">พร้อมใช้งานทันที</p>
+            <p className="mt-2 text-sm text-stone-500">Ready to use</p>
           </div>
           <div className="glass-panel rounded-3xl p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
@@ -181,7 +169,7 @@ export default function Home() {
             <p className="mt-4 text-3xl font-semibold text-stone-900">
               {overview.occupied}
             </p>
-            <p className="mt-2 text-sm text-stone-500">อัปเดตจากเซนเซอร์</p>
+            <p className="mt-2 text-sm text-stone-500">Updated from sensors</p>
           </div>
           <div className="glass-panel rounded-3xl p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
@@ -204,7 +192,7 @@ export default function Home() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
               Insight
             </p>
-            <h3 className="mt-3 text-xl text-stone-900">ชั้นที่ว่างที่สุด</h3>
+            <h3 className="mt-3 text-xl text-stone-900">Most Available Floor</h3>
             <p className="mt-2 text-sm text-stone-500">
               {mostAvailableFloor?.floor_name}
             </p>
@@ -216,7 +204,7 @@ export default function Home() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
               Insight
             </p>
-            <h3 className="mt-3 text-xl text-stone-900">ชั้นที่แน่นที่สุด</h3>
+            <h3 className="mt-3 text-xl text-stone-900">Busiest Floor</h3>
             <p className="mt-2 text-sm text-stone-500">
               {busiestFloor?.floor_name}
             </p>
@@ -242,13 +230,13 @@ export default function Home() {
               </div>
               <div className="flex flex-wrap gap-3">
                 <div className="rounded-2xl bg-white/80 px-4 py-3 text-sm font-semibold text-stone-700">
-                  รวม {overview.total} ช่อง
+                  Total {overview.total} slots
                 </div>
                 <div className="rounded-2xl bg-emerald-100 px-4 py-3 text-sm font-semibold text-emerald-700">
-                  ว่าง {overview.available} ช่อง
+                  {overview.available} available
                 </div>
                 <div className="rounded-2xl bg-stone-100 px-4 py-3 text-sm font-semibold text-stone-700">
-                  ว่าง {Math.round((overview.available / overview.total) * 100)}%
+                  {Math.round((overview.available / overview.total) * 100)}% free
                 </div>
               </div>
             </div>
@@ -277,11 +265,11 @@ export default function Home() {
                           </span>
                         </p>
                         <p className="mt-1 text-xs text-stone-400">
-                          อัปเดตล่าสุด
+                          Last updated
                         </p>
                       </div>
                       <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                        ว่าง {availabilityRate}%
+                        {availabilityRate}% free
                       </span>
                     </div>
 
@@ -293,8 +281,8 @@ export default function Home() {
                     </div>
 
                     <div className="mt-4 flex items-center justify-between text-xs text-stone-500">
-                      <span>จอดแล้ว {occupied} คัน</span>
-                      <span>เหลือ {available} ช่อง</span>
+                      <span>{occupied} occupied</span>
+                      <span>{available} available</span>
                     </div>
 
                     <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
@@ -316,7 +304,7 @@ export default function Home() {
                         href={`/floor/${floor.floor_id}`}
                         className="rounded-full bg-stone-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-stone-800"
                       >
-                        ดูช่องจอด
+                        View Spots
                       </Link>
                     </div>
                   </div>
