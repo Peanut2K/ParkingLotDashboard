@@ -5,11 +5,35 @@ import { createPortal } from "react-dom";
 
 type PaymentModalProps = {
   fee: number;
-  receiptId: string;
+  transactionId: string;
+  onPaymentSuccess?: () => void;
 };
 
-export default function PaymentModal({ fee, receiptId }: PaymentModalProps) {
+type PaymentStatus = 'idle' | 'loading' | 'success' | 'error';
+
+export default function PaymentModal({ fee, transactionId, onPaymentSuccess }: PaymentModalProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const handleSimulatePayment = async () => {
+    setPaymentStatus('loading');
+    setErrorMsg('');
+    try {
+      const res = await fetch(`/api/transactions/${transactionId}/payment`, {
+        method: 'PUT',
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? `Error ${res.status}`);
+      }
+      setPaymentStatus('success');
+      onPaymentSuccess?.();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Payment failed');
+      setPaymentStatus('error');
+    }
+  };
 
   if (fee === 0) {
     return null; // Don't show button if free
@@ -83,10 +107,41 @@ export default function PaymentModal({ fee, receiptId }: PaymentModalProps) {
                     <p className="text-center text-sm font-semibold text-stone-400">
                       QR Code for Payment
                     </p>
-                    <p className="text-xs text-stone-400">{receiptId}</p>
+                    <p className="text-xs text-stone-400">{transactionId}</p>
                   </div>
                 </div>
               </div>
+
+              {/* Simulate Payment Button */}
+              {paymentStatus !== 'success' ? (
+                <button
+                  onClick={handleSimulatePayment}
+                  disabled={paymentStatus === 'loading'}
+                  className="w-full rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {paymentStatus === 'loading' ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+                      </svg>
+                      Processing…
+                    </span>
+                  ) : (
+                    'Test Payment'
+                  )}
+                </button>
+              ) : (
+                <div className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-50 px-6 py-3 text-sm font-semibold text-emerald-700">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Payment successful!
+                </div>
+              )}
+              {paymentStatus === 'error' && (
+                <p className="-mt-2 text-center text-xs text-red-500">{errorMsg}</p>
+              )}
 
               <div className="space-y-4 rounded-2xl bg-stone-50 p-4">
                 <div className="flex items-center justify-between">
@@ -94,7 +149,7 @@ export default function PaymentModal({ fee, receiptId }: PaymentModalProps) {
                     Receipt No.
                   </span>
                   <span className="font-mono text-sm font-semibold text-stone-900">
-                    {receiptId}
+                    {transactionId}
                   </span>
                 </div>
                 <div className="flex items-center justify-between border-t border-stone-200 pt-4">

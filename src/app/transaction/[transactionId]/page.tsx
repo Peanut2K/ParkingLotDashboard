@@ -5,7 +5,7 @@ import { useEffect, useState, use } from "react";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
 type PageProps = {
-  params: Promise<{ receiptId: string }>;
+  params: Promise<{ transactionId: string }>;
 };
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -17,6 +17,7 @@ type Receipt = {
   buildingName: string;
   entryTime: string; // ISO 8601
   plateNumber?: string;
+  status: string;
 };
 
 type ApiTransaction = {
@@ -38,15 +39,17 @@ type ApiResponse = {
   transactions: ApiTransaction[];
 };
 
+const FREE_PERIOD_HOURS = 1 / 60;
+
 const calculateParkingFee = (entryTime: Date, exitTime: Date) => {
   const durationMs = exitTime.getTime() - entryTime.getTime();
   const durationHours = durationMs / (1000 * 60 * 60);
   
-  if (durationHours <= 1) {
+  if (durationHours <= FREE_PERIOD_HOURS) {
     return { hours: durationHours, fee: 0, freeHour: true };
   }
   
-  const billableHours = Math.ceil(durationHours - 1);
+  const billableHours = Math.ceil(durationHours - FREE_PERIOD_HOURS);
   const fee = billableHours * 20;
   
   return { hours: durationHours, fee, freeHour: false, billableHours };
@@ -86,18 +89,19 @@ const formatShortTime = (date: Date) => {
 };
 
 export default function ReceiptPage({ params }: PageProps) {
-  const rawReceiptId = use(params).receiptId;
-  let receiptId = rawReceiptId;
+  const rawtransactionId = use(params).transactionId;
+  let transactionId = rawtransactionId;
   try {
-    while (receiptId.includes('%')) {
-      receiptId = decodeURIComponent(receiptId);
+    while (transactionId.includes('%')) {
+      transactionId = decodeURIComponent(transactionId);
     }
   } catch (e) {
-    receiptId = rawReceiptId;
+    transactionId = rawtransactionId;
   }
   
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPaid, setIsPaid] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -105,7 +109,7 @@ export default function ReceiptPage({ params }: PageProps) {
     const fetchData = async () => {
       try {
         // Call Next.js API Route proxy to avoid CORS
-        const response = await fetch(`/api/transactions?license_plate=${encodeURIComponent(receiptId)}`);
+        const response = await fetch(`/api/transactions?license_plate=${encodeURIComponent(transactionId)}`);
         
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`);
@@ -122,7 +126,11 @@ export default function ReceiptPage({ params }: PageProps) {
             buildingName: transaction.building,
             entryTime: transaction.entry_time,
             plateNumber: transaction.license_plate,
+            status: transaction.status,
           });
+          if (transaction.status === 'PAID') {
+            setIsPaid(true);
+          }
         } else if (isMounted) {
           setReceipt(null);
         }
@@ -143,7 +151,7 @@ export default function ReceiptPage({ params }: PageProps) {
     return () => {
       isMounted = false;
     };
-  }, [receiptId]);
+  }, [transactionId]);
 
   if (loading) {
     return <LoadingSpinner />;
@@ -153,7 +161,7 @@ export default function ReceiptPage({ params }: PageProps) {
     notFound();
   }
   
-  // receiptId is the license_plate from the path e.g. /receipt/ABC1234
+  // transactionId is the license_plate from the path e.g. /receipt/ABC1234
 
   const entryTime = new Date(receipt.entryTime);
   const currentTime = new Date(); // in the future this could come from API
@@ -322,46 +330,60 @@ export default function ReceiptPage({ params }: PageProps) {
                 </p>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-stone-600">First 1 hour</span>
-                  <span className="font-semibold text-emerald-700">Free</span>
-                </div>
-                {pricing.billableHours && pricing.billableHours > 0 && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-stone-600">
-                      Additional time ({pricing.billableHours} hr × ฿20)
-                    </span>
-                    <span className="font-semibold text-stone-900">
-                      ฿{pricing.billableHours * 20}
-                    </span>
+              {isPaid ? (
+                <div className="flex flex-col items-center gap-3 rounded-2xl bg-emerald-50 border-2 border-emerald-200 p-8">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white">
+                    <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
                   </div>
-                )}
-              </div>
+                  <p className="text-xl font-bold text-emerald-800">Payment Completed</p>
+                  <p className="text-sm text-emerald-600">Your payment was successful</p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-stone-600">First 1 minute</span>
+                      <span className="font-semibold text-emerald-700">Free</span>
+                    </div>
+                    {pricing.billableHours && pricing.billableHours > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-stone-600">
+                          Additional time ({pricing.billableHours} hr × ฿20)
+                        </span>
+                        <span className="font-semibold text-stone-900">
+                          ฿{pricing.billableHours * 20}
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-              <div className="rounded-2xl bg-stone-900 p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-stone-400">
-                      Total Amount
-                    </p>
-                    {pricing.freeHour && (
-                      <p className="mt-1 text-xs text-stone-500">
-                        🎉 Free! Within 1 hour
+                  <div className="rounded-2xl bg-stone-900 p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-stone-400">
+                          Total Amount
+                        </p>
+                        {pricing.freeHour && (
+                          <p className="mt-1 text-xs text-stone-500">
+                            🎉 Free! Within 1 hour
+                          </p>
+                        )}
+                      </div>
+                      <p className="text-4xl font-bold text-white">
+                        {pricing.fee === 0 ? (
+                          <span className="text-emerald-400">฿0</span>
+                        ) : (
+                          <span>฿{pricing.fee}</span>
+                        )}
                       </p>
-                    )}
+                    </div>
                   </div>
-                  <p className="text-4xl font-bold text-white">
-                    {pricing.fee === 0 ? (
-                      <span className="text-emerald-400">฿0</span>
-                    ) : (
-                      <span>฿{pricing.fee}</span>
-                    )}
-                  </p>
-                </div>
-              </div>
 
-              <PaymentModal fee={pricing.fee} receiptId={receipt.id} />
+                  <PaymentModal fee={pricing.fee} transactionId={receipt.id} onPaymentSuccess={() => setIsPaid(true)} />
+                </>
+              )}
             </div>
 
             {/* Footer Info */}
