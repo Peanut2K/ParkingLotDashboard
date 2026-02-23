@@ -141,7 +141,7 @@ export default function Home() {
               Live now
             </div>
             <h1 className="text-4xl leading-tight text-stone-900 sm:text-5xl">
-              ParkingLot Dashboard
+              Smart Parking Lot Dashboard
             </h1>
             <p className="max-w-2xl text-base text-stone-600 sm:text-lg">
               Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
