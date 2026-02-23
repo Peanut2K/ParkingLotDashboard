@@ -102,6 +102,14 @@ export default function ReceiptPage({ params }: PageProps) {
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPaid, setIsPaid] = useState(false);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+
+  useEffect(() => {
+    if (isPaymentOpen || isPaid) return;
+    const interval = setInterval(() => setCurrentTime(new Date()), 30000);
+    return () => clearInterval(interval);
+  }, [isPaymentOpen, isPaid]);
 
   useEffect(() => {
     let isMounted = true;
@@ -164,7 +172,6 @@ export default function ReceiptPage({ params }: PageProps) {
   // transactionId is the license_plate from the path e.g. /receipt/ABC1234
 
   const entryTime = new Date(receipt.entryTime);
-  const currentTime = new Date(); // in the future this could come from API
   const pricing = calculateParkingFee(entryTime, currentTime);
 
   return (
@@ -381,7 +388,7 @@ export default function ReceiptPage({ params }: PageProps) {
                     </div>
                   </div>
 
-                  <PaymentModal fee={pricing.fee} transactionId={receipt.id} onPaymentSuccess={() => setIsPaid(true)} />
+                  <PaymentModal fee={pricing.fee} transactionId={receipt.id} onPaymentSuccess={() => setIsPaid(true)} onOpen={() => setIsPaymentOpen(true)} onClose={() => setIsPaymentOpen(false)} />
                 </>
               )}
             </div>

@@ -7,12 +7,17 @@ type PaymentModalProps = {
   fee: number;
   transactionId: string;
   onPaymentSuccess?: () => void;
+  onOpen?: () => void;
+  onClose?: () => void;
 };
 
 type PaymentStatus = 'idle' | 'loading' | 'success' | 'error';
 
-export default function PaymentModal({ fee, transactionId, onPaymentSuccess }: PaymentModalProps) {
+export default function PaymentModal({ fee, transactionId, onPaymentSuccess, onOpen, onClose }: PaymentModalProps) {
   const [isOpen, setIsOpen] = useState(false);
+
+  const openModal = () => { setIsOpen(true); onOpen?.(); };
+  const closeModal = () => { setIsOpen(false); onClose?.(); };
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -42,7 +47,7 @@ export default function PaymentModal({ fee, transactionId, onPaymentSuccess }: P
   return (
     <>
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={openModal}
         className="w-full rounded-2xl bg-emerald-600 px-6 py-4 text-lg font-semibold text-white transition hover:bg-emerald-700 active:scale-[0.98]"
       >
         💳 Pay ฿{fee}
@@ -51,7 +56,7 @@ export default function PaymentModal({ fee, transactionId, onPaymentSuccess }: P
       {isOpen && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-          onClick={() => setIsOpen(false)}
+          onClick={closeModal}
         >
           <div
             className="glass-panel w-full max-w-md rounded-3xl p-8 max-h-[90vh] overflow-y-auto"
@@ -68,7 +73,7 @@ export default function PaymentModal({ fee, transactionId, onPaymentSuccess }: P
                   </p>
                 </div>
                 <button
-                  onClick={() => setIsOpen(false)}
+                  onClick={closeModal}
                   className="rounded-full p-2 text-stone-400 transition hover:bg-stone-100 hover:text-stone-600"
                 >
                   <svg
