@@ -8,7 +8,7 @@ export async function GET(request: Request) {
 
   try {
     const apiUrl = process.env.API_URL || 'http://localhost:8000';
-    const url = `${apiUrl}/transactions?license_plate=${encodeURIComponent(license_plate)}`;
+    const url = `${apiUrl}/transactions?license_plate=${encodeURIComponent(license_plate)}&active=true`;
     const response = await fetch(url);
 
     if (!response.ok) {
