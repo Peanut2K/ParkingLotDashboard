@@ -27,6 +27,8 @@ export default function PaymentModal({ fee, transactionId, onPaymentSuccess, onO
     try {
       const res = await fetch(`/api/transactions/${transactionId}/payment`, {
         method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fee }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
