@@ -21,9 +21,31 @@ type ApiResponse = {
   parking_spots: ParkingSpot[];
 };
 
+type HealthData = {
+  date: string;
+  last_update: string;
+  status: string;
+  database: string;
+};
+
 export default function Home() {
   const [parkingData, setParkingData] = useState<ApiResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [health, setHealth] = useState<HealthData | null>(null);
+
+  useEffect(() => {
+    const fetchHealth = async () => {
+      try {
+        const res = await fetch('/api/health');
+        if (res.ok) setHealth(await res.json());
+      } catch {
+        // ignore
+      }
+    };
+    fetchHealth();
+    const interval = setInterval(fetchHealth, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const eventSource = new EventSource('/api/parking-spots/stream');
@@ -128,15 +150,23 @@ export default function Home() {
           <div className="glass-panel flex flex-col gap-3 rounded-3xl px-6 py-5 text-sm text-stone-700">
             <div className="flex items-center justify-between gap-6">
               <span className="font-semibold text-stone-500">Date</span>
-              <span className="font-semibold text-stone-900">Feb 16, 2026</span>
+              <span className="font-semibold text-stone-900">{health?.date ?? '—'}</span>
             </div>
             <div className="flex items-center justify-between gap-6">
               <span className="font-semibold text-stone-500">Last update</span>
-              <span className="font-semibold text-stone-900">09:15</span>
+              <span className="font-semibold text-stone-900">{health?.last_update ?? '—'}</span>
             </div>
             <div className="flex items-center justify-between gap-6">
               <span className="font-semibold text-stone-500">Status</span>
-              <span className="font-semibold text-emerald-700">Stable</span>
+              <span className={`font-semibold ${health?.status === 'Stable' ? 'text-emerald-700' : health ? 'text-red-600' : 'text-stone-400'}`}>
+                {health?.status ?? '—'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-6">
+              <span className="font-semibold text-stone-500">Database</span>
+              <span className={`font-semibold ${health?.database === 'connected' ? 'text-emerald-700' : health ? 'text-red-600' : 'text-stone-400'}`}>
+                {health?.database ?? '—'}
+              </span>
             </div>
           </div>
         </header>
