@@ -95,7 +95,7 @@ export default function ReceiptPage({ params }: PageProps) {
     while (transactionId.includes('%')) {
       transactionId = decodeURIComponent(transactionId);
     }
-  } catch (e) {
+  } catch (e) { 
     transactionId = rawtransactionId;
   }
   
@@ -263,16 +263,26 @@ export default function ReceiptPage({ params }: PageProps) {
                 </div>
               </div>
 
-              {receipt.plateNumber && (
-                <div className="rounded-2xl border-2 border-stone-900 bg-white p-4">
-                  <p className="text-xs font-semibold text-stone-500">
-                    License Plate
-                  </p>
-                  <p className="mt-1 text-center text-3xl font-bold tracking-wider text-stone-900">
-                    {receipt.plateNumber}
-                  </p>
-                </div>
-              )}
+              {receipt.plateNumber && (() => {
+                const match = receipt.plateNumber.match(/^(.*\d)\s*(.*)$/);
+                const plateCode = match?.[1] ?? receipt.plateNumber;
+                const province = match?.[2] ?? '';
+                return (
+                  <div className="rounded-2xl border-2 border-stone-900 bg-white p-4">
+                    <p className="text-xs font-semibold text-stone-500">
+                      License Plate
+                    </p>
+                    <p className="mt-1 text-center text-3xl font-bold tracking-wider text-stone-900">
+                      {plateCode}
+                    </p>
+                    {province && (
+                      <p className="mt-1 text-center text-xl font-medium text-stone-600">
+                        {province}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Time Details */}
